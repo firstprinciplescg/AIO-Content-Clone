@@ -18,7 +18,7 @@ add_action( 'admin_menu', function() {
 });
 
 add_action( 'admin_init', function() {
-	// --- Register all settings ---
+	// Register all settings
 	register_setting(
 		'aio_cc_settings',
 		'md_clone_post_types',
@@ -27,7 +27,7 @@ add_action( 'admin_init', function() {
 			'sanitize_callback' => function( $val ) {
 				return array_map( 'sanitize_text_field', (array) $val );
 			},
-			'default'           => [ 'post' ],
+			'default' => [ 'post' ],
 		]
 	);
 
@@ -37,7 +37,7 @@ add_action( 'admin_init', function() {
 		[
 			'type'              => 'string',
 			'sanitize_callback' => 'sanitize_textarea_field',
-			'default'           => "ChatGPT\n",
+			'default' => "ChatGPT\n",
 		]
 	);
 
@@ -47,11 +47,10 @@ add_action( 'admin_init', function() {
 		[
 			'type'              => 'string',
 			'sanitize_callback' => 'sanitize_file_name',
-			'default'           => 'md-clones',
+			'default' => 'md-clones',
 		]
 	);
 
-	// Yes/no toggles
 	foreach ( [ 'llms', 'txt', 'json', 'metadata' ] as $feature ) {
 		register_setting(
 			'aio_cc_settings',
@@ -61,7 +60,7 @@ add_action( 'admin_init', function() {
 				'sanitize_callback' => function( $val ) {
 					return in_array( $val, [ 'yes', 'no' ], true ) ? $val : 'no';
 				},
-				'default'           => ( $feature === 'json' || $feature === 'metadata' ) ? 'yes' : 'no',
+				'default' => ( $feature === 'json' || $feature === 'metadata' ) ? 'yes' : 'no',
 			]
 		);
 	}
@@ -74,7 +73,7 @@ add_action( 'admin_init', function() {
 			'sanitize_callback' => function( $val ) {
 				return array_map( 'sanitize_text_field', (array) $val );
 			},
-			'default'           => [
+			'default' => [
 				'id', 'slug', 'title', 'author', 'date',
 				'modified', 'permalink', 'post_type',
 				'categories', 'tags', 'excerpt', 'json_url',
@@ -82,17 +81,44 @@ add_action( 'admin_init', function() {
 		]
 	);
 
-	// --- Settings section ---
-	add_settings_section(
-		'aio_cc_main',
-		__( 'Main Settings', 'aio-content-clone' ),
-		'__return_null',
-		'aio-content-clone'
+	// LLMs.txt Manifest settings
+	register_setting(
+		'aio_cc_settings',
+		'md_clone_generate_llms_manifest',
+		[
+			'type'              => 'string',
+			'sanitize_callback' => function( $v ) {
+				return in_array( $v, [ 'yes', 'no' ], true ) ? $v : 'no';
+			},
+			'default' => 'no',
+		]
 	);
 
-	// --- Settings fields ---
+	register_setting(
+		'aio_cc_settings',
+		'md_clone_llms_filename',
+		[
+			'type'              => 'string',
+			'sanitize_callback' => 'sanitize_file_name',
+			'default' => 'llms.txt',
+		]
+	);
 
-	// Post Types
+	register_setting(
+		'aio_cc_settings',
+		'md_clone_llms_location',
+		[
+			'type'              => 'string',
+			'sanitize_callback' => function( $v ) {
+				return in_array( $v, [ 'upload', 'root' ], true ) ? $v : 'upload';
+			},
+			'default' => 'upload',
+		]
+	);
+
+	// Main settings section
+	add_settings_section( 'aio_cc_main', __( 'Main Settings', 'aio-content-clone' ), '__return_null', 'aio-content-clone' );
+
 	add_settings_field(
 		'md_clone_post_types',
 		__( 'Post Types', 'aio-content-clone' ),
@@ -112,7 +138,6 @@ add_action( 'admin_init', function() {
 		'aio_cc_main'
 	);
 
-	// LLM Bot User-Agents
 	add_settings_field(
 		'md_clone_bot_agents',
 		__( 'LLM Bot User-Agents', 'aio-content-clone' ),
@@ -128,7 +153,6 @@ add_action( 'admin_init', function() {
 		'aio_cc_main'
 	);
 
-	// Output Directory
 	add_settings_field(
 		'md_clone_output_dir',
 		__( 'Output Directory', 'aio-content-clone' ),
@@ -144,71 +168,29 @@ add_action( 'admin_init', function() {
 		'aio_cc_main'
 	);
 
-	// Enable LLMs
-	add_settings_field(
-		'md_clone_enable_llms',
-		__( 'Allow LLM Access', 'aio-content-clone' ),
-		function() {
-			$value = get_option( 'md_clone_enable_llms', 'yes' );
-			printf(
-				'<label><input type="checkbox" name="md_clone_enable_llms" value="yes"%s> %s</label>',
-				checked( $value, 'yes', false ),
-				esc_html__( 'Allow configured bots to fetch .md files.', 'aio-content-clone' )
-			);
-		},
-		'aio-content-clone',
-		'aio_cc_main'
-	);
+	foreach ( [
+		'md_clone_enable_llms'     => 'Allow LLM Access',
+		'md_clone_enable_txt'      => 'Generate .txt Fallback',
+		'md_clone_enable_json'     => 'Generate .json Export',
+		'md_clone_enable_metadata' => 'Embed Metadata',
+	] as $option => $label ) {
+		add_settings_field(
+			$option,
+			__( $label, 'aio-content-clone' ),
+			function() use ( $option, $label ) {
+				$value = get_option( $option, 'no' );
+				printf(
+					'<label><input type="checkbox" name="%1$s" value="yes"%2$s> %3$s</label>',
+					esc_attr( $option ),
+					checked( $value, 'yes', false ),
+					esc_html__( $label, 'aio-content-clone' )
+				);
+			},
+			'aio-content-clone',
+			'aio_cc_main'
+		);
+	}
 
-	// Generate .txt fallback
-	add_settings_field(
-		'md_clone_enable_txt',
-		__( 'Generate .txt Fallback', 'aio-content-clone' ),
-		function() {
-			$value = get_option( 'md_clone_enable_txt', 'no' );
-			printf(
-				'<label><input type="checkbox" name="md_clone_enable_txt" value="yes"%s> %s</label>',
-				checked( $value, 'yes', false ),
-				esc_html__( 'Also create a .txt version of each Markdown file.', 'aio-content-clone' )
-			);
-		},
-		'aio-content-clone',
-		'aio_cc_main'
-	);
-
-	// Generate .json export
-	add_settings_field(
-		'md_clone_enable_json',
-		__( 'Generate .json Export', 'aio-content-clone' ),
-		function() {
-			$value = get_option( 'md_clone_enable_json', 'yes' );
-			printf(
-				'<label><input type="checkbox" name="md_clone_enable_json" value="yes"%s> %s</label>',
-				checked( $value, 'yes', false ),
-				esc_html__( 'Also create a .json structured export of each post.', 'aio-content-clone' )
-			);
-		},
-		'aio-content-clone',
-		'aio_cc_main'
-	);
-
-	// Embed Metadata
-	add_settings_field(
-		'md_clone_enable_metadata',
-		__( 'Embed Metadata', 'aio-content-clone' ),
-		function() {
-			$value = get_option( 'md_clone_enable_metadata', 'yes' );
-			printf(
-				'<label><input type="checkbox" name="md_clone_enable_metadata" value="yes"%s> %s</label>',
-				checked( $value, 'yes', false ),
-				esc_html__( 'Embed metadata in front matter (and JSON).', 'aio-content-clone' )
-			);
-		},
-		'aio-content-clone',
-		'aio_cc_main'
-	);
-
-	// Fields to Include
 	add_settings_field(
 		'md_clone_metadata_fields',
 		__( 'Fields to Include', 'aio-content-clone' ),
@@ -228,6 +210,53 @@ add_action( 'admin_init', function() {
 		'aio-content-clone',
 		'aio_cc_main'
 	);
+
+	// LLMs.txt specific settings
+	add_settings_field(
+		'md_clone_generate_llms_manifest',
+		__( 'Generate llms.txt', 'aio-content-clone' ),
+		function() {
+			$val = get_option( 'md_clone_generate_llms_manifest', 'no' );
+			printf(
+				'<label><input type="checkbox" name="md_clone_generate_llms_manifest" value="yes"%s> %s</label>',
+				checked( $val, 'yes', false ),
+				esc_html__( 'Enable auto-generation of llms.txt based on bot list.', 'aio-content-clone' )
+			);
+		},
+		'aio-content-clone',
+		'aio_cc_main'
+	);
+
+	add_settings_field(
+		'md_clone_llms_filename',
+		__( 'Manifest Filename', 'aio-content-clone' ),
+		function() {
+			$value = get_option( 'md_clone_llms_filename', 'llms.txt' );
+			printf(
+				'<input type="text" name="md_clone_llms_filename" value="%s" class="regular-text">',
+				esc_attr( $value )
+			);
+		},
+		'aio-content-clone',
+		'aio_cc_main'
+	);
+
+	add_settings_field(
+		'md_clone_llms_location',
+		__( 'Manifest Location', 'aio-content-clone' ),
+		function() {
+			$val = get_option( 'md_clone_llms_location', 'upload' );
+			?>
+			<select name="md_clone_llms_location">
+				<option value="upload" <?php selected( $val, 'upload' ); ?>><?php esc_html_e( 'Uploads folder', 'aio-content-clone' ); ?></option>
+				<option value="root"   <?php selected( $val, 'root' ); ?>><?php esc_html_e( 'Site root (if writable)', 'aio-content-clone' ); ?></option>
+			</select>
+			<p class="description"><?php esc_html_e( 'Choose where the manifest will be written.', 'aio-content-clone' ); ?></p>
+			<?php
+		},
+		'aio-content-clone',
+		'aio_cc_main'
+	);
 });
 
 function aio_cc_render_settings_page() {
@@ -236,11 +265,32 @@ function aio_cc_render_settings_page() {
 		<h1><?php esc_html_e( 'AIO Content Clone Settings', 'aio-content-clone' ); ?></h1>
 		<form method="post" action="options.php">
 			<?php
-				settings_fields( 'aio_cc_settings' );
-				do_settings_sections( 'aio-content-clone' );
-				submit_button();
+			settings_fields( 'aio_cc_settings' );
+			do_settings_sections( 'aio-content-clone' );
+			submit_button();
 			?>
 		</form>
+
+		<?php
+		// Show current manifest location
+		$enabled  = get_option( 'md_clone_generate_llms_manifest', 'no' );
+		if ( 'yes' === $enabled ) {
+			$filename = sanitize_file_name( get_option( 'md_clone_llms_filename', 'llms.txt' ) );
+			$location = get_option( 'md_clone_llms_location', 'upload' );
+			$upload   = wp_upload_dir();
+			$url      = ( $location === 'upload' )
+				? trailingslashit( $upload['baseurl'] ) . $filename
+				: site_url( '/' . $filename );
+			?>
+			<hr>
+			<h2><?php esc_html_e( 'LLMs.txt Manifest Preview', 'aio-content-clone' ); ?></h2>
+			<p>
+				<strong><?php esc_html_e( 'Public URL:', 'aio-content-clone' ); ?></strong><br>
+				<a href="<?php echo esc_url( $url ); ?>" target="_blank"><?php echo esc_html( $url ); ?></a>
+			</p>
+			<?php
+		}
+		?>
 	</div>
 	<?php
 }
