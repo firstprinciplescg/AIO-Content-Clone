@@ -57,14 +57,27 @@ add_action( 'update_option_md_clone_llms_location',           [ 'MD_Generator', 
 // Serve markdown on a simple endpoint (optional)
 
 add_action( 'init', function() {
-
     if ( isset( $_GET['md_clone_download'] ) && intval( $_GET['md_clone_download'] ) ) {
-
+        // Check if LLM access is enabled and validate user agent
+        if ( 'yes' === get_option( 'md_clone_enable_llms', 'no' ) ) {
+            $allowed_agents = array_filter( array_map( 'trim', preg_split( '/\r?\n/', get_option( 'md_clone_bot_agents', '' ) ) ) );
+            $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+            
+            $is_allowed = false;
+            foreach ( $allowed_agents as $agent ) {
+                if ( stripos( $user_agent, $agent ) !== false ) {
+                    $is_allowed = true;
+                    break;
+                }
+            }
+            
+            if ( ! $is_allowed && ! current_user_can( 'edit_posts' ) ) {
+                wp_die( __( 'Access denied. This content is only available to authorized LLMs.', 'aio-content-clone' ) );
+            }
+        }
+        
         serve_markdown_to_llm( intval( $_GET['md_clone_download'] ) );
-
         exit;
-
     }
-
 });
 
